@@ -5,6 +5,7 @@ __pycache__/
 
 # folders
 MNIST/
+runs/
 
 # C extensions
 *.so
