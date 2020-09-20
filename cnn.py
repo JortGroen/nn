@@ -7,6 +7,8 @@ Created on Wed Sep  9 14:14:06 2020
 https://pytorch.org/tutorials/beginner/blitz/neural_networks_tutorial.html
 """
 
+# conda activate nn && tensorboard --logdir=D:/Jort/Documents/nn/runs
+
 import torch
 import torch.nn as nn
 import torch.optim as optim
@@ -14,19 +16,9 @@ import torch.nn.functional as F
 from torch.utils.data import DataLoader
 import torchvision.datasets as datasets
 import torchvision.transforms as transforms
+import loggernn
+from torch.utils.tensorboard import SummaryWriter
 
-#create network
-class NN(nn.Module):
-    def __init__(self, input_size, num_classes):
-        super(NN, self).__init__()
-        self.fc1 = nn.Linear(input_size, 50)
-        self.fc2 = nn.Linear(50, num_classes)
-        
-    def forward(self, x):
-        x = F.relu(self.fc1(x))
-        x = self.fc2(x)
-        #print(x.shape)
-        return x
     
 class CNN(nn.Module):
     def __init__(self, in_shape, num_classes):
@@ -50,30 +42,6 @@ class CNN(nn.Module):
         #print(x.shape)
         return x
         
-# evaluation
-def check_accuracy(loader, model):
-    if loader.dataset.train:
-        print('Checking accuracy on training data')
-    else:
-        print('Checking accuracy on test data')
-        
-    num_correct = 0
-    num_samples = 0
-    model.eval()
-    
-    with torch.no_grad():
-        for x, y in loader:
-            x = x.to(device=device)
-            y = y.to(device=device)
-            #x = x.reshape(x.shape[0], -1)
-            
-            scores = model(x)
-            _, predictions = scores.max(1)
-            num_correct += (predictions == y).sum()
-            num_samples += predictions.size(0) 
-            
-        print(f'Got {num_correct} / {num_samples} with accuracy {float(num_correct)/float(num_samples)*100:.2f}')
-    model.train()
     
 def check_single(x,y, model):
     print('checking data')
@@ -92,6 +60,8 @@ def check_single(x,y, model):
     print(f'Got {num_correct} / {num_samples} with accuracy {float(num_correct)/float(num_samples)*100:.2f}')
     model.train()
     
+
+writer = SummaryWriter('runs/mnist_cnn_adam')
     
 # set device
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
@@ -112,14 +82,19 @@ test_loader = DataLoader(dataset=test_dataset, batch_size=batch_size, shuffle=Tr
 # Initialise network
 #model = NN(input_size=input_size, num_classes=num_classes).to(device)
 model = CNN(in_shape=[batch_size, 1, 28, 28], num_classes=num_classes)
+model.to(device)
 
 # loss and optimiser
 criterion = nn.CrossEntropyLoss()
-optimiser = optim.SGD(model.parameters(), lr=learning_rate)
+# optimiser = optim.SGD(model.parameters(), lr=learning_rate)
+optimiser = optim.Adam(model.parameters(), lr=learning_rate)
 
-data, targets = next(iter(train_loader))
-#targets = targets.view(1, -1)
-print(targets.shape)
+# data1, targets = next(iter(train_loader))
+# #targets = targets.view(1, -1)
+# print(targets.shape)
+# model(data1)
+# print(model(data1).shape)
+
 #data2 = data.reshape(data.shape[0], -1)
 #data = data.squeeze(1)
 
@@ -129,8 +104,8 @@ for epoch in range(num_epochs):
     print('epoch: ', epoch)
     
     for batchIdx, (data, targets) in enumerate(train_loader):
-        data = data.to(device=device)
-        targets = targets.to(device=device)
+        data = data.to(device)
+        targets = targets.to(device)
         
         # reshape
         #data = data.reshape(data.shape[0], -1)
@@ -145,12 +120,16 @@ for epoch in range(num_epochs):
         
         # gradient decent(data, model)
         optimiser.step()
+        
+    loggernn.tensorboard_update(writer, model, criterion, device, train_loader, test_loader, epoch)
     
-#check_single(data, targets, model)
-check_accuracy(train_loader, model)
-check_accuracy(test_loader, model)
+
             
-            
+loggernn.check_accuracy(train_loader, model, criterion, device)
+loggernn.check_accuracy(test_loader, model, criterion, device)
+
+writer.flush()
+writer.close()            
 
             
             
